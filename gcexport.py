@@ -9,7 +9,7 @@ Fork Author:        Johannes Heinrich (https://github.com/JohannesHeinrich/)
 Fork Author:        Matej Boxan
 Date:               March 27, 2019
 Description:        This script will export fitness data from Garmin Connect
-                    See README.md for more detailed information
+					See README.md for more detailed information
 """
 
 from math import floor
@@ -33,8 +33,8 @@ import zipfile
 
 script_version = '1.0.0'
 current_date = datetime.now().strftime('%Y-%m-%d')
-activities_directory = './' + current_date + '_garmin_connect_export'
-
+activities_directory = './data/gpx/'
+activity_datetime_format = '%Y-%m-%d %H:%M:%S'
 parser = argparse.ArgumentParser()
 
 # TODO: Implement verbose and/or quiet options.
@@ -50,17 +50,21 @@ parser.add_argument('-f', '--format', nargs='?', choices=['gpx', 'tcx', 'origina
 	help="export format; can be 'gpx', 'tcx', 'original' or 'json' (default: 'gpx')")
 
 parser.add_argument('-d', '--directory', nargs='?', default=activities_directory,
-	help="the directory to export to (default: './YYYY-MM-DD_garmin_connect_export')")
+	help="the directory to export to (default: './data/gpx')")
+
+parser.add_argument('-s', '--startDate', nargs='?', default="1970/01/01", help="specify the last activity date in the format YYYY-MM-DD (default 1970/01/01)")
 
 parser.add_argument('-u', '--unzip',
 	help="if downloading ZIP files (format: 'original'), unzip the file and removes the ZIP file",
 	action="store_true")
 
+parser.add_argument('-t', '--type', nargs='?', choices=['running', 'cycling', 'hiking', 'other', 'walking', 'all', 'swimming'], default='all', help='select activity type (default: all)')
+
 args = parser.parse_args()
 
 if args.version:
-    print((argv[0], ", version ", script_version))
-    exit(0)
+	print((argv[0], ", version ", script_version))
+	exit(0)
 
 cookie_jar = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_jar))
@@ -68,81 +72,81 @@ opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookie_j
 
 # url is a string, post is a dictionary of POST parameters, headers is a dictionary of headers.
 def http_req(url, post=None, headers={}):
-    request = urllib.request.Request(url)
-    # request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1337 Safari/537.36')  # Tell Garmin we're some supported browser.
-    request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2816.0 Safari/537.36')  # Tell Garmin we're some supported browser.
-    for header_key, header_value in headers.items():
-        request.add_header(header_key, header_value)
-        print("add header:", header_key ,":",header_value)
-    if post:
-        # print("POSTING")
-        post = urlencode(post).encode('ascii')  # Convert dictionary to POST parameter string.
-    # print(request.headers)
-    # print(cookie_jar)
-    # print(post)
-    # print(request)
-    response = opener.open(request, data=post)  # This line may throw a urllib2.HTTPError.
+	request = urllib.request.Request(url)
+	# request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1337 Safari/537.36')  # Tell Garmin we're some supported browser.
+	request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2816.0 Safari/537.36')  # Tell Garmin we're some supported browser.
+	for header_key, header_value in headers.items():
+		request.add_header(header_key, header_value)
+		print("add header:", header_key ,":",header_value)
+	if post:
+		# print("POSTING")
+		post = urlencode(post).encode('ascii')  # Convert dictionary to POST parameter string.
+	# print(request.headers)
+	# print(cookie_jar)
+	# print(post)
+	# print(request)
+	response = opener.open(request, data=post)  # This line may throw a urllib2.HTTPError.
 
-    # N.B. urllib2 will follow any 302 redirects. Also, the "open" call above may throw a urllib2.HTTPError which is checked for below.
-    # print(response.getcode())
-    if response.getcode() == 204:
-        # For activities without GPS coordinates, there is no GPX download (204 = no content).
-        # Write an empty file to prevent redownloading it.
-        print('Writing empty file since there was no GPX activity data...')
-        return ''
-    elif response.getcode() != 200:
-        raise Exception('Bad return code (' + str(response.getcode()) + ') for: ' + url)
+	# N.B. urllib2 will follow any 302 redirects. Also, the "open" call above may throw a urllib2.HTTPError which is checked for below.
+	# print(response.getcode())
+	if response.getcode() == 204:
+		# For activities without GPS coordinates, there is no GPX download (204 = no content).
+		# Write an empty file to prevent redownloading it.
+		print('Writing empty file since there was no GPX activity data...')
+		return ''
+	elif response.getcode() != 200:
+		raise Exception('Bad return code (' + str(response.getcode()) + ') for: ' + url)
 
-    return response.read().decode('utf-8')
+	return response.read().decode('utf-8')
 
 def absentOrNull(element, a):
-    if not a:
-        return True
-    elif element not in a:
-        return True
-    elif a[element]:
-        return False
-    else:
-        return True
+	if not a:
+		return True
+	elif element not in a:
+		return True
+	elif a[element]:
+		return False
+	else:
+		return True
 
 def fromActivitiesOrDetail(element, a, detail, detailContainer):
-    if absentOrNull(detailContainer, detail) or absentOrNull(element, detail[detailContainer]):
-        return None if absentOrNull(element, a) else a[element]
-    else:
-        return details[detailContainer][element]
+	if absentOrNull(detailContainer, detail) or absentOrNull(element, detail[detailContainer]):
+		return None if absentOrNull(element, a) else a[element]
+	else:
+		return details[detailContainer][element]
 
 def trunc6(f):
-    return "{0:12.6f}".format(floor(f*1000000)/1000000).lstrip()
+	return "{0:12.6f}".format(floor(f*1000000)/1000000).lstrip()
 
 # A class building tzinfo objects for fixed-offset time zones.
 # (copied from https://docs.python.org/2/library/datetime.html)
 class FixedOffset(tzinfo):
-    """Fixed offset in minutes east from UTC."""
+	"""Fixed offset in minutes east from UTC."""
 
-    def __init__(self, offset, name):
-        self.__offset = timedelta(minutes = offset)
-        self.__name = name
+	def __init__(self, offset, name):
+		self.__offset = timedelta(minutes = offset)
+		self.__name = name
 
-    def utcoffset(self, dt):
-        return self.__offset
+	def utcoffset(self, dt):
+		return self.__offset
 
-    def tzname(self, dt):
-        return self.__name
+	def tzname(self, dt):
+		return self.__name
 
-    def dst(self, dt):
-        return timedelta(0)
+	def dst(self, dt):
+		return timedelta(0)
 
 # build an 'aware' datetime from two 'naive' datetime objects (that is timestamps
 # as present in the activities.json), using the time difference as offset
 def offsetDateTime(timeLocal, timeGMT):
-    localDT = datetime.strptime(timeLocal, "%Y-%m-%d %H:%M:%S")
-    gmtDT = datetime.strptime(timeGMT, "%Y-%m-%d %H:%M:%S")
-    offset = localDT - gmtDT
-    offsetTz = FixedOffset(offset.seconds/60, "LCL")
-    return localDT.replace(tzinfo=offsetTz)
+	localDT = datetime.strptime(timeLocal, "%Y-%m-%d %H:%M:%S")
+	gmtDT = datetime.strptime(timeGMT, "%Y-%m-%d %H:%M:%S")
+	offset = localDT - gmtDT
+	offsetTz = FixedOffset(offset.seconds/60, "LCL")
+	return localDT.replace(tzinfo=offsetTz)
 
 def hhmmssFromSeconds(sec):
-    return str(timedelta(seconds=int(sec))).zfill(8)
+	return str(timedelta(seconds=int(sec))).zfill(8)
 
 # this is almost the datetime format Garmin used in the activity-search-service
 # JSON 'display' fields (Garmin didn't zero-pad the date and the hour, but %d and %H do)
@@ -167,26 +171,26 @@ parent_type_id = {
 uses_pace = set([1, 3, 9]) # running, hiking, walking
 
 def paceOrSpeedRaw(typeId, parentTypeId, mps):
-    kmh = 3.6 * mps
-    if (typeId in uses_pace) or (parentTypeId in uses_pace):
-    	return 60 / kmh
-    else:
-    	return kmh
+	kmh = 3.6 * mps
+	if (typeId in uses_pace) or (parentTypeId in uses_pace):
+		return 60 / kmh
+	else:
+		return kmh
 
 def paceOrSpeedFormatted(typeId, parentTypeId, mps):
-    kmh = 3.6 * mps
-    if (typeId in uses_pace) or (parentTypeId in uses_pace):
-        # format seconds per kilometer as MM:SS, see https://stackoverflow.com/a/27751293
-        return '{0:02d}:{1:02d}'.format(*divmod(int(round(3600 / kmh)), 60))
-    else:
-        return "{0:.1f}".format(round(kmh, 1))
+	kmh = 3.6 * mps
+	if (typeId in uses_pace) or (parentTypeId in uses_pace):
+		# format seconds per kilometer as MM:SS, see https://stackoverflow.com/a/27751293
+		return '{0:02d}:{1:02d}'.format(*divmod(int(round(3600 / kmh)), 60))
+	else:
+		return "{0:.1f}".format(round(kmh, 1))
 
 
 print('Welcome to Garmin Connect Exporter!')
 
 # Create directory for data files.
 if isdir(args.directory):
-    print('Warning: Output directory already exists. Will skip already-downloaded files and append to the CSV file.')
+	print('Warning: Output directory already exists. Will skip already-downloaded files and append to the CSV file.')
 
 username = args.username if args.username else input('Username: ')
 password = args.password if args.password else getpass()
@@ -206,25 +210,25 @@ SSO = "https://sso.garmin.com/sso"
 CSS = "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css"
 
 data = {'service': REDIRECT,
-    'webhost': WEBHOST,
-    'source': BASE_URL,
-    'redirectAfterAccountLoginUrl': REDIRECT,
-    'redirectAfterAccountCreationUrl': REDIRECT,
-    'gauthHost': SSO,
-    'locale': 'en_US',
-    'id': 'gauth-widget',
-    'cssUrl': CSS,
-    'clientId': 'GarminConnect',
-    'rememberMeShown': 'true',
-    'rememberMeChecked': 'false',
-    'createAccountShown': 'true',
-    'openCreateAccount': 'false',
-    'usernameShown': 'false',
-    'displayNameShown': 'false',
-    'consumeServiceTicket': 'false',
-    'initialFocus': 'true',
-    'embedWidget': 'false',
-    'generateExtraServiceTicket': 'false'}
+	'webhost': WEBHOST,
+	'source': BASE_URL,
+	'redirectAfterAccountLoginUrl': REDIRECT,
+	'redirectAfterAccountCreationUrl': REDIRECT,
+	'gauthHost': SSO,
+	'locale': 'en_US',
+	'id': 'gauth-widget',
+	'cssUrl': CSS,
+	'clientId': 'GarminConnect',
+	'rememberMeShown': 'true',
+	'rememberMeChecked': 'false',
+	'createAccountShown': 'true',
+	'openCreateAccount': 'false',
+	'usernameShown': 'false',
+	'displayNameShown': 'false',
+	'consumeServiceTicket': 'false',
+	'initialFocus': 'true',
+	'embedWidget': 'false',
+	'generateExtraServiceTicket': 'false'}
 
 print((urllib.parse.urlencode(data)))
 
@@ -265,7 +269,7 @@ print('Finished authentication')
 
 # We should be logged in now.
 if not isdir(args.directory):
-    mkdir(args.directory)
+	mkdir(args.directory)
 
 csv_filename = args.directory + '/activities.csv'
 csv_existed = isfile(csv_filename)
@@ -274,7 +278,7 @@ csv_file = open(csv_filename, 'a')
 
 # Write header to CSV file
 if not csv_existed:
-    csv_file.write('Activity name,\
+	csv_file.write('Activity name,\
 Description,\
 Begin timestamp,\
 Duration (h:m:s),\
@@ -337,25 +341,25 @@ Sample count\n')
 # Activity parent,\
 
 if args.count == 'all':
-    # If the user wants to download all activities, first download one,
-    # then the result of that request will tell us how many are available
-    # so we will modify the variables then.
-    print("Making result summary request ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    print(url_gc_summary)
-    result = http_req(url_gc_summary)
-    print("Finished result summary request ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+	# If the user wants to download all activities, first download one,
+	# then the result of that request will tell us how many are available
+	# so we will modify the variables then.
+	print("Making result summary request ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+	print(url_gc_summary)
+	result = http_req(url_gc_summary)
+	print("Finished result summary request ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
-    # Persist JSON
-    json_filename = args.directory + '/activities-summary.json'
-    json_file = open(json_filename, 'a')
-    json_file.write(result)
-    json_file.close()
+	# Persist JSON
+	json_filename = args.directory + '/activities-summary.json'
+	json_file = open(json_filename, 'a')
+	json_file.write(result)
+	json_file.close()
 
-    # Modify total_to_download based on how many activities the server reports.
-    json_results = json.loads(result)  # TODO: Catch possible exceptions here.
-    total_to_download = int(json_results['results']['totalFound'])
+	# Modify total_to_download based on how many activities the server reports.
+	json_results = json.loads(result)  # TODO: Catch possible exceptions here.
+	total_to_download = int(json_results['results']['totalFound'])
 else:
-    total_to_download = int(args.count)
+	total_to_download = int(args.count)
 total_downloaded = 0
 
 device_dict = dict()
@@ -388,9 +392,17 @@ while total_downloaded < total_to_download:
 
 	# Pull out just the list of activities.
 	activities = json_results
-
+	print('looking for activities of type: ' + args.type)
 	# Process each activity.
 	for a in activities:
+		if(a['activityType']['typeKey'] != args.type and args.type != 'all'):
+			print("skipping activity: " + a['activityName'] + " due to it's type: " + a['activityType']['typeKey'])
+			print(total_downloaded, num_to_download)
+			continue
+
+		if(datetime.strptime(a['startTimeLocal'], activity_datetime_format) < datetime.strptime(args.startDate, "%Y/%m/%d")):
+			print("ending due to startdate")
+			break
 		# Display which entry we're working on.
 		print(('Garmin Connect activity: [' + str(a['activityId']) + ']'))
 		print((a['activityName']))
@@ -563,26 +575,26 @@ while total_downloaded < total_to_download:
 		csv_record += '""'         # no Sample Count in JSON
 		csv_record += '\n'
 
-#		csv_record += empty_record if absentOrNull('gainElevation', a) else '"' + a['gainElevation']['value'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('minElevation', a) else '"' + a['minElevation']['value'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('maxElevation', a) else '"' + a['maxElevation']['value'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('maxElevation', a) else '"' + a['maxElevation']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('weightedMeanMovingSpeed', a) else '"' + a['weightedMeanMovingSpeed']['display'].replace('"', '""') + '",'  # The units vary between Minutes per Mile and mph, but withUnit always displays "Minutes per Mile"
-#		csv_record += empty_record if absentOrNull('maxSpeed', a) else '"' + a['maxSpeed']['display'].replace('"', '""') + '",'  # The units vary between Minutes per Mile and mph, but withUnit always displays "Minutes per Mile"
-#		csv_record += empty_record if absentOrNull('sumEnergy', a) else '"' + a['sumEnergy']['display'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('sumElapsedDuration', a) else '"' + a['sumElapsedDuration']['value'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('sumMovingDuration', a) else '"' + a['sumMovingDuration']['value'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('weightedMeanSpeed', a) else '"' + a['weightedMeanSpeed']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('sumDistance', a) else '"' + a['sumDistance']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('minElevation', a) else '"' + a['minElevation']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('gainElevation', a) else '"' + a['gainElevation']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('lossElevation', a) else '"' + a['lossElevation']['withUnit'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('weightedMeanBikeCadence', a) else '"' + a['weightedMeanBikeCadence']['withUnitAbbr'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('maxBikeCadence', a) else '"' + a['maxBikeCadence']['withUnitAbbr'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('weightedMeanAirTemperature', a) else '"' + a['weightedMeanAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('minAirTemperature', a) else '"' + a['minAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('maxAirTemperature', a) else '"' + a['maxAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
-#		csv_record += empty_record if absentOrNull('activityType', a) else '"' + a['activityType']['parent']['display'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('gainElevation', a) else '"' + a['gainElevation']['value'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('minElevation', a) else '"' + a['minElevation']['value'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('maxElevation', a) else '"' + a['maxElevation']['value'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('maxElevation', a) else '"' + a['maxElevation']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('weightedMeanMovingSpeed', a) else '"' + a['weightedMeanMovingSpeed']['display'].replace('"', '""') + '",'  # The units vary between Minutes per Mile and mph, but withUnit always displays "Minutes per Mile"
+#        csv_record += empty_record if absentOrNull('maxSpeed', a) else '"' + a['maxSpeed']['display'].replace('"', '""') + '",'  # The units vary between Minutes per Mile and mph, but withUnit always displays "Minutes per Mile"
+#        csv_record += empty_record if absentOrNull('sumEnergy', a) else '"' + a['sumEnergy']['display'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('sumElapsedDuration', a) else '"' + a['sumElapsedDuration']['value'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('sumMovingDuration', a) else '"' + a['sumMovingDuration']['value'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('weightedMeanSpeed', a) else '"' + a['weightedMeanSpeed']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('sumDistance', a) else '"' + a['sumDistance']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('minElevation', a) else '"' + a['minElevation']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('gainElevation', a) else '"' + a['gainElevation']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('lossElevation', a) else '"' + a['lossElevation']['withUnit'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('weightedMeanBikeCadence', a) else '"' + a['weightedMeanBikeCadence']['withUnitAbbr'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('maxBikeCadence', a) else '"' + a['maxBikeCadence']['withUnitAbbr'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('weightedMeanAirTemperature', a) else '"' + a['weightedMeanAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('minAirTemperature', a) else '"' + a['minAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('maxAirTemperature', a) else '"' + a['maxAirTemperature']['withUnitAbbr'].replace('"', '""') + '",'
+#        csv_record += empty_record if absentOrNull('activityType', a) else '"' + a['activityType']['parent']['display'].replace('"', '""') + '",'
 
 		csv_file.write(csv_record)
 
