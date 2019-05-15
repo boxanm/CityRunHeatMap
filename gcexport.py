@@ -75,6 +75,7 @@ def http_req(url, post=None, headers={}):
 	request = urllib.request.Request(url)
 	# request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1337 Safari/537.36')  # Tell Garmin we're some supported browser.
 	request.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2816.0 Safari/537.36')  # Tell Garmin we're some supported browser.
+	request.add_header('origin', 'https://sso.garmin.com') #this new header is needed after recent changes made by Garmin
 	for header_key, header_value in headers.items():
 		request.add_header(header_key, header_value)
 		print("add header:", header_key ,":",header_value)
@@ -203,9 +204,12 @@ limit_maximum = 1000
 max_tries = 3
 
 WEBHOST = "https://connect.garmin.com"
-REDIRECT = "https://connect.garmin.com/post-auth/login"
-BASE_URL = "http://connect.garmin.com/en-US/signin"
-GAUTH = "http://connect.garmin.com/gauth/hostname"
+#REDIRECT = "https://connect.garmin.com/post-auth/login"
+REDIRECT = "https://connect.garmin.com/modern/"
+#BASE_URL = "http://connect.garmin.com/en-US/signin"
+BASE_URL = "https://sso.garmin.com/sso/signin"
+#GAUTH = "http://connect.garmin.com/gauth/hostname"
+GAUTH = "https://connect.garmin.com/modern/auth/hostname"
 SSO = "https://sso.garmin.com/sso"
 CSS = "https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css"
 
@@ -233,16 +237,15 @@ data = {'service': REDIRECT,
 print((urllib.parse.urlencode(data)))
 
 # URLs for various services.
-url_gc_login     = 'https://sso.garmin.com/sso/login?' + urllib.parse.urlencode(data)
+url_gc_login     = 'https://sso.garmin.com/sso/signin?' + urllib.parse.urlencode(data)
 url_gc_post_auth = 'https://connect.garmin.com/modern/activities?'
-url_gc_summary   = 'https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities?start=0&limit=1'
+url_gc_summary   = 'https://connect.garmin.com/modern/proxy/activitylist-service/activities/search/activities?start=0&limit=1'
 url_gc_search    = 'https://connect.garmin.com/modern/proxy/activitylist-service/activities/search/activities?'
 url_gc_activity  = 'https://connect.garmin.com/modern/proxy/activity-service/activity/'
 url_gc_device    = 'https://connect.garmin.com/modern/proxy/device-service/deviceservice/app-info/'
 url_gc_gpx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/gpx/activity/'
 url_gc_tcx_activity = 'https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/'
-url_gc_original_activity = 'http://connect.garmin.com/proxy/download-service/files/activity/'
-
+url_gc_original_activity = 'http://connect.garmin.com/modern/proxy/download-service/files/activity/'
 # Initially, we need to get a valid session cookie, so we pull the login page.
 print('Request login page')
 http_req(url_gc_login)

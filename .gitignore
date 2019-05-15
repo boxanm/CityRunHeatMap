@@ -1,6 +1,9 @@
+data/
+images/
+tests/
+__pycache__/
 
-.DS_Store
-extras/
+osm\.py
 
 data/
 
