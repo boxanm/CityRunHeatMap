@@ -15,8 +15,10 @@ from customClasses import Cell
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-a', '--activities', help='download new activities from garmin connect', action='store_true')
-parser.add_argument('-d', '--downloadMap', help='download map')
+parser.add_argument('-d', '--downloadMap', help='download map', action='store_true')
+parser.add_argument('-f', '--file', help='load existing .graphml file')
 
+args = parser.parse_args()
 
 place_name = "Grenoble, France" #da se udelat jako list nekolika mist
 point1 = (45.1904, 5.7607)
@@ -25,7 +27,7 @@ distance = 5000
 distance_type_var = 'network'
 network_type_var = 'walk'
 
-filename = 'grenoble_4000.graphml'
+filename = 'grenoble_5000.graphml'
 path_gpx = 'data/gpx/'
 path_maps = 'data/maps/'
 
@@ -68,9 +70,6 @@ for file in gpx_files:
     lon = []
     lat = []
     last_point = (0,0)
-    # if(datetime.datetime.strptime(file.time, datetime_format) < startDate):#TODO date
-    #     print('activity too old ')
-    #     continue
     for track in gpx.tracks:
         if(track.type != type):
             continue
@@ -107,7 +106,7 @@ print("and cell's sizes of: ", cell_size_width, "x" ,cell_size_height)
 
 #load map
 lap = time.time()
-map, img_map = functions.loadOSMMap(download = True, extent=(max_longitude, max_latitude, min_longitude, min_latitude), zoom=15)
+figure_tracks, ax1 = functions.loadOSMnxMap(file = args.file, download = args.downloadMap, saveMap = False)
 print("Done in: ", time.time() - lap, " s")
 
 lap = time.time()
@@ -211,11 +210,9 @@ for lon, lat in lon_lat_list:
 
 all_segments.sort(key = lambda x: x[2])
 for segment in all_segments:
-    x, y = zip(*(map.rev_geocode((p1, p2)) for p1, p2 in zip(segment[0], segment[1])))
-    plt.plot(x, y, color = cmap(segment[2]), linewidth = 7)
+    plt.plot(segment[0], segment[1], color = cmap(segment[2]), linewidth = 7)
 
-# figure_tracks.show()
-plt.imshow(img_map)
+figure_tracks.show()
 print("Done in: ", time.time() - lap, " s")
 lap = time.time()
 

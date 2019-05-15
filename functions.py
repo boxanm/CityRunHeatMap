@@ -8,26 +8,28 @@ import matplotlib.cm as cm
 import numpy as np
 import geotiler
 
-def loadOSMMap(filename = None, path = None, download = False, saveMap = False, extent=None, zoom = 16):
-    place_name = "Grenoble, France" #da se udelat jako list nekolika mist
-    point1 = (45.1904, 5.7607)
+def loadOSMnxMap(file = None, download = False, saveMap = False):
+    point1 = (45.1904, 5.7607) #todo load point from given gpx
+
+    distance = 5000
+    distance_type_var = 'network'
+    network_type_var = 'walk'
 
     print("==============   Loading map   ==================")
-    if(not filename and not path and not download):
+    if(not file and not download):
         print('No map specified')
-    # elif(filename and path):
-        # graph = osmnx.load_graphml(filename = filename,folder = path)
-        # print("Map ", filename, " loaded")
-        # return osmnx.plot_graph(graph, show = False, close = False)
-    elif(download and extent != None):
-        map = geotiler.Map(extent=extent, zoom=zoom)
-        img = geotiler.render_map(map)
-        # if(saveMap):
-            # plt.savefig('map.pdf', bbox_inches='tight')
+    elif(file):
+        graph = osmnx.load_graphml(filename = file,folder = path)#todo divide filename into path and file
         print("Map loaded")
-        return map, img
-
+        return osmnx.plot_graph(graph, show = False, close = False)
+    elif(download):
+        graph = osmnx.graph_from_point(point1, distance, distance_type = distance_type_var, network_type = network_type_var)
+        if(saveMap):
+            osmnx.save_graphml(graph, filename = 'graph1.hraphml')
+        print("Map loaded")
+        return osmnx.plot_graph(graph, show = False, close = False)
     return None, None
+
 def loadFiles(path, download = False):
     print("================Searching for gpx files===================")
     gpx_files = []
