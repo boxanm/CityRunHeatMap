@@ -1,3 +1,9 @@
 
 .DS_Store
 extras/
+
+data/
+
+tests/
+
+__pycache__/
