@@ -16,20 +16,11 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('-a', '--activities', help='download new activities from garmin connect', action='store_true')
 parser.add_argument('-d', '--downloadMap', help='download map', action='store_true')
+parser.add_argument('-s', '--saveMap', help='save map', action='store_true')
 parser.add_argument('-f', '--file', help='load existing .graphml file')
 
 args = parser.parse_args()
-
-place_name = "Grenoble, France" #da se udelat jako list nekolika mist
-point1 = (45.1904, 5.7607)
-
-distance = 5000
-distance_type_var = 'network'
-network_type_var = 'walk'
-
-filename = 'grenoble_5000.graphml'
 path_gpx = 'data/gpx/'
-path_maps = 'data/maps/'
 
 startDate = datetime.datetime(2019, 1, 21)
 
@@ -49,7 +40,6 @@ segment_len = 0
 fade_size = 5
 fade_last_segment_len = 10
 min_segment_len = 100
-type = 'running'
 datetime_format = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
@@ -71,12 +61,9 @@ for file in gpx_files:
     lat = []
     last_point = (0,0)
     for track in gpx.tracks:
-        if(track.type != type):
-            continue
         for segment in track.segments:
             for gps_point in segment.points:
-                if(functions.haversine(last_point, (gps_point.longitude, gps_point.latitude)) > 2):
-                    #to avoid bias in heat in uphills, when you move slower
+                if(functions.haversine(last_point, (gps_point.longitude, gps_point.latitude)) > 2):#to avoid bias in heat in uphills, when you move slower, the haversine distance between two points has to be at least 2 meters
                     lon.append(gps_point.longitude)
                     lat.append(gps_point.latitude)
                     if(max_latitude < gps_point.latitude):
@@ -106,7 +93,7 @@ print("and cell's sizes of: ", cell_size_width, "x" ,cell_size_height)
 
 #load map
 lap = time.time()
-figure_tracks, ax1 = functions.loadOSMnxMap(file = args.file, download = args.downloadMap, saveMap = False)
+figure_tracks, ax1 = functions.loadOSMnxMap(file = args.file, download = args.downloadMap, saveMap = args.saveMap)
 print("Done in: ", time.time() - lap, " s")
 
 lap = time.time()
@@ -208,11 +195,10 @@ for lon, lat in lon_lat_list:
     segment[0] = []
     segment[1] = []
 
+
 all_segments.sort(key = lambda x: x[2])
 for segment in all_segments:
     plt.plot(segment[0], segment[1], color = cmap(segment[2]), linewidth = 7)
-
-figure_tracks.show()
 print("Done in: ", time.time() - lap, " s")
 lap = time.time()
 

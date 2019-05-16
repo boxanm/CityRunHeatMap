@@ -7,11 +7,12 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 import geotiler
+from pathlib import Path
 
 def loadOSMnxMap(file = None, download = False, saveMap = False):
     point1 = (45.1904, 5.7607) #todo load point from given gpx
 
-    distance = 5000
+    distance = 1000
     distance_type_var = 'network'
     network_type_var = 'walk'
 
@@ -19,13 +20,15 @@ def loadOSMnxMap(file = None, download = False, saveMap = False):
     if(not file and not download):
         print('No map specified')
     elif(file):
-        graph = osmnx.load_graphml(filename = file,folder = path)#todo divide filename into path and file
+        graph = osmnx.load_graphml(filename = file, folder = None)
         print("Map loaded")
-        return osmnx.plot_graph(graph, show = False, close = False)
+        g, a = osmnx.plot_graph(graph, show = False, close = False)
+        return g,a
     elif(download):
         graph = osmnx.graph_from_point(point1, distance, distance_type = distance_type_var, network_type = network_type_var)
         if(saveMap):
-            osmnx.save_graphml(graph, filename = 'graph1.hraphml')
+            osmnx.save_graphml(graph, filename = 'map.hraphml')
+            print('Map saved')
         print("Map loaded")
         return osmnx.plot_graph(graph, show = False, close = False)
     return None, None
@@ -58,8 +61,9 @@ def logarithmAsymptotic(x):
     return (a*math.log10(1+x))/(1+a*math.log10(1+x))
 
 def normalize(x, minimum, maximum):
-    if(minimum == 0):
-        minimum = 1
+    if(maximum - minimum == 0):
+        return x
+    # print('normalize x: ', x, " => ", (x - minimum)/(maximum - minimum))
     return (x - minimum)/(maximum - minimum)
 
 def deleteDuplicateLabels():
@@ -72,7 +76,7 @@ def deleteDuplicateLabels():
         else:
             i +=1
     # (handles,labels).sort()#TODO sort
-    return handles, labels
+    return handles, labelsprint
 
 #returns haversine distance between 2 points in meters
 def haversine(coord1, coord2):
